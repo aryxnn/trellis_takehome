@@ -76,6 +76,7 @@ class OrderWorkflow:
         self._recent_error: Optional[str] = None
         self._shipping_retries: int = 0
         self._dispatch_failed_reason: Optional[str] = None
+        self._confidence_score: float = 1.0
 
     @workflow.run
     async def run(self, order_id: str, payment_id: str) -> Dict[str, Any]:
@@ -98,6 +99,8 @@ class OrderWorkflow:
             self._current_step = "FAILED"
             raise
 
+        self._confidence_score = order_data.get("confidence_score", 1.0)
+
         self._current_step = "VALIDATING"
         try:
             await workflow.execute_activity(
@@ -115,25 +118,30 @@ class OrderWorkflow:
             self._current_step = "FAILED"
             raise
 
-        self._current_step = "PENDING_MANUAL_REVIEW"
-        try:
-            await workflow.wait_condition(
-                lambda: self._approved or self._cancelled,
-                timeout=8.0
-            )
-        except asyncio.TimeoutError:
-            self._recent_error = "Manual review timed out after 8s"
-            self._current_step = "EXPIRED"
-            raise TimeoutError("Approval window expired")
+        # Human-in-the-loop Gate: Trigger review ONLY if confidence is below 90%
+        if self._confidence_score < 0.90:
+            self._current_step = "PENDING_MANUAL_REVIEW"
+            try:
+                await workflow.wait_condition(
+                    lambda: self._approved or self._cancelled,
+                    timeout=8.0
+                )
+            except asyncio.TimeoutError:
+                self._recent_error = f"Manual review timed out (Confidence: {self._confidence_score})"
+                self._current_step = "EXPIRED"
+                raise TimeoutError("Approval window expired")
 
-        if self._cancelled:
-            self._current_step = "CANCELLED"
-            await workflow.execute_activity(
-                activities.ship_order_activity,
-                payload={"order_id": order_id},
-                start_to_close_timeout=timedelta(seconds=1)
-            )
-            return {"status": "cancelled", "order_id": order_id}
+            if self._cancelled:
+                self._current_step = "CANCELLED"
+                await workflow.execute_activity(
+                    activities.ship_order_activity,
+                    payload={"order_id": order_id},
+                    start_to_close_timeout=timedelta(seconds=1)
+                )
+                return {"status": "cancelled", "order_id": order_id}
+        else:
+            # Straight-through processing for high confidence (auto-approved)
+            self._approved = True
 
         if self._updated_address:
             order_data["address"] = self._updated_address
@@ -192,7 +200,8 @@ class OrderWorkflow:
             "status": "completed",
             "order_id": order_id,
             "payment": payment_res,
-            "shipping_retries": self._shipping_retries
+            "shipping_retries": self._shipping_retries,
+            "auto_approved": self._confidence_score >= 0.90
         }
 
     @workflow.signal
@@ -222,5 +231,6 @@ class OrderWorkflow:
             "updated_address": self._updated_address,
             "recent_error": self._recent_error,
             "shipping_retries": self._shipping_retries,
-            "dispatch_failed_reason": self._dispatch_failed_reason
+            "dispatch_failed_reason": self._dispatch_failed_reason,
+            "confidence_score": self._confidence_score
         }

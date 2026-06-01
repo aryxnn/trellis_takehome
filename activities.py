@@ -14,9 +14,19 @@ async def flaky_call() -> None:
 async def order_received(order_id: str) -> Dict[str, Any]:
     await flaky_call()
     initial_address = {"street": "123 Stanford Ave", "city": "Palo Alto", "state": "CA", "zip": "94306"}
+    
+    # Simulate a confidence score of the AI extraction (ranging from 65% to 100%)
+    confidence = round(random.uniform(0.65, 1.0), 2)
+    
     await db.create_order(order_id, "RECEIVED", initial_address)
-    await db.log_event(order_id, "ORDER_RECEIVED", {"order_id": order_id, "address": initial_address})
-    return {"order_id": order_id, "items": [{"sku": "ABC", "qty": 1}], "address": initial_address}
+    await db.log_event(order_id, "ORDER_RECEIVED", {"order_id": order_id, "address": initial_address, "confidence_score": confidence})
+    
+    return {
+        "order_id": order_id, 
+        "items": [{"sku": "ABC", "qty": 1}], 
+        "address": initial_address,
+        "confidence_score": confidence
+    }
 
 async def order_validated(order: Dict[str, Any]) -> bool:
     await flaky_call()

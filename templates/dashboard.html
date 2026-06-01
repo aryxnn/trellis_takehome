@@ -578,6 +578,10 @@
                         <div class="info-card-value" id="info-temporal-step">None</div>
                     </div>
                     <div class="info-card">
+                        <div class="info-card-label">AI Confidence</div>
+                        <div class="info-card-value" id="info-confidence">100%</div>
+                    </div>
+                    <div class="info-card">
                         <div class="info-card-label">Shipping Retries</div>
                         <div class="info-card-value" id="info-retries">0</div>
                     </div>
@@ -593,7 +597,7 @@
                         <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background: var(--warning); animation: pulse 1s infinite;"></span>
                         Manual Review Required (Prior Auth Gate)
                     </h4>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;" id="review-explanation">
                         The OrderWorkflow is waiting for manual authorization to proceed. Please approve the payment charge, or cancel the order.
                     </p>
                     <div class="actions-panel">
@@ -734,6 +738,9 @@
                 document.getElementById('info-retries').innerText = status.temporal.shipping_retries || 0;
                 document.getElementById('info-temporal-step').innerText = status.temporal.current_step || 'FINISHED';
                 
+                const confidence = status.temporal.confidence_score || 1.0;
+                document.getElementById('info-confidence').innerText = Math.round(confidence * 100) + '%';
+                
                 // Status badge
                 const dbState = status.db.state;
                 const detailStatus = document.getElementById('detail-status');
@@ -747,6 +754,7 @@
                 const reviewControls = document.getElementById('review-controls');
                 if (status.temporal.current_step === 'PENDING_MANUAL_REVIEW') {
                     reviewControls.style.display = 'block';
+                    document.getElementById('review-explanation').innerText = `AI Extraction Confidence is ${Math.round(confidence * 100)}% (below the 90% auto-approval threshold). Manual clinician review is required to proceed.`;
                 } else {
                     reviewControls.style.display = 'none';
                 }
