@@ -58,7 +58,21 @@ To align with how Trellis operates, I mapped the required order lifecycle primit
 
 ---
 
-## 3. Technical Decisions & Trade-offs
+## 3. Console & Workflow Visualizations
+
+Below are screenshots showing the operational consoles in action during local workflow execution:
+
+### Human-in-the-Loop Ops Console Dashboard
+Exposes order metadata, active Temporal state steps, AI extraction confidence scores, and manual signal actions:
+![Trellis Ops Console Dashboard](tests/screenshots/order_lifecycle.png)
+
+### Temporal Web UI Workflows List
+Displays task queue isolation of parent `OrderWorkflow` and child `ShippingWorkflow` runs:
+![Temporal Web UI Workflows](tests/screenshots/workflows.png)
+
+---
+
+## 4. Technical Decisions & Trade-offs
 
 ### SQLite with Thread Pools
 *   **Why**: SQLite was chosen for zero-dependency local runs (no port conflicts on the grading machine).
@@ -70,7 +84,7 @@ To align with how Trellis operates, I mapped the required order lifecycle primit
 
 ---
 
-## 4. Local Setup & Verification
+## 5. Local Setup & Verification
 
 ### Prerequisites
 Make sure the Temporal local server is running.
