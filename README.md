@@ -7,9 +7,25 @@ This repository is my submission for the Trellis AI Forward Deployed Engineer ta
 To align with how Trellis operates, I mapped the required order lifecycle primitives to real-world healthcare workflows:
 
 *   **Intake (`ReceiveOrder` & `ValidateOrder`)**: Models patient document intake and automated checks against insurer guidelines.
-*   **Manual Review Queue**: A clinical human gate (prior auth review) where a nurse or doctor must manually authorize or modify the request.
 *   **Idempotent Submission (`ChargePayment`)**: Models submitting the auth to an insurance portal. Uses a SQL unique constraint (`payment_id`) to ensure that retries (due to timeout or network drops) never trigger duplicate submissions.
 *   **Isolated Sync (`ShippingWorkflow`)**: Runs on its own task queue (`shipping-tq`) to demonstrate queue isolation, ensuring downstream EHR sync bottlenecks do not block incoming ingestion.
+
+---
+
+## 2. High-Leverage Features Implemented
+
+### Dynamic Confidence Score Routing (Straight-Through Processing)
+*   **Scenario**: When a clinical document is parsed, the AI extraction assigns a confidence score (simulated from 65% to 100%).
+*   **Behavior**: 
+    *   **Auto-Approve ($\ge$ 90%)**: High-confidence extractions bypass the manual queue entirely and trigger the charge/shipping workflows immediately.
+    *   **Review Queue (< 90%)**: Low-confidence cases are routed to the `PENDING_MANUAL_REVIEW` step, suspending the workflow for up to 8 seconds for human clinician overrides.
+
+### Clinical human-in-the-loop Review Console
+*   Exposes a real-time console at `http://localhost:8000` showing active workflow states and retry counters.
+*   Provides action triggers to **Approve**, **Reject**, or **Signal Address Updates** to the in-flight workflow.
+
+### Non-repudiation Audit Trail
+*   Every state transition, activity failure, retry, and manual override is recorded in an immutable `events` table in the local SQL database, providing a compliance timeline.
 
 ```
        +------------------------------------+
@@ -42,7 +58,7 @@ To align with how Trellis operates, I mapped the required order lifecycle primit
 
 ---
 
-## 2. Technical Decisions & Trade-offs
+## 3. Technical Decisions & Trade-offs
 
 ### SQLite with Thread Pools
 *   **Why**: SQLite was chosen for zero-dependency local runs (no port conflicts on the grading machine).
@@ -54,7 +70,7 @@ To align with how Trellis operates, I mapped the required order lifecycle primit
 
 ---
 
-## 3. Local Setup & Verification
+## 4. Local Setup & Verification
 
 ### Prerequisites
 Make sure the Temporal local server is running.
